@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Reddit AI Reply",
+  "version": "1.0.0",
+  "description": "Generate AI-powered replies on Reddit with one click",
+  "permissions": ["storage", "contextMenus", "scripting"],
+  "host_permissions": [
+    "https://www.reddit.com/*",
+    "https://reddit.com/*",
+    "https://api.netmind.ai/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.reddit.com/*", "https://reddit.com/*"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Reddit AI Reply"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

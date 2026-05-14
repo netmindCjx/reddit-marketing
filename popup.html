@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reddit AI Reply</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 300px;
+      padding: 16px;
+      margin: 0;
+      background: #fff;
+      color: #1a1a1b;
+    }
+    h2 { margin: 0 0 14px; font-size: 15px; }
+    label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; margin-top: 10px; }
+    select, input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fafafa;
+    }
+    input { font-family: monospace; }
+    select { cursor: pointer; }
+    .section { margin-top: 4px; }
+    button {
+      margin-top: 14px;
+      width: 100%;
+      padding: 8px;
+      background: #ff4500;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #e03d00; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    p { font-size: 12px; margin: 8px 0 0; min-height: 16px; }
+    p.ok   { color: #2d9c4d; }
+    p.err  { color: #e53e3e; }
+    p.info { color: #888; }
+    .hint { font-size: 11px; color: #999; margin-top: 6px; }
+    .divider { border: none; border-top: 1px solid #eee; margin: 14px 0 0; }
+  </style>
+</head>
+<body>
+  <h2>Reddit AI Reply</h2>
+
+  <label for="provider">AI Provider</label>
+  <select id="provider">
+    <option value="netmind">NetMind AI</option>
+    <option value="claude">Claude (Anthropic)</option>
+    <option value="openai">OpenAI</option>
+  </select>
+
+  <!-- NetMind -->
+  <div id="netmind-section" class="section">
+    <label for="netmind-key">NetMind API Key</label>
+    <input id="netmind-key" type="password" placeholder="API key…" autocomplete="off" />
+    <label for="netmind-model">Model</label>
+    <input id="netmind-model" type="text" value="deepseek-ai/DeepSeek-V4-Flash" />
+    <p class="hint">Endpoint: api.netmind.ai/inference-api/anthropic/v1</p>
+  </div>
+
+  <!-- Claude -->
+  <div id="claude-section" class="section" style="display:none">
+    <label for="claude-key">Claude API Key</label>
+    <input id="claude-key" type="password" placeholder="sk-ant-…" autocomplete="off" />
+    <p class="hint">Get your key at console.anthropic.com</p>
+  </div>
+
+  <!-- OpenAI -->
+  <div id="openai-section" class="section" style="display:none">
+    <label for="openai-key">OpenAI API Key</label>
+    <input id="openai-key" type="password" placeholder="sk-…" autocomplete="off" />
+    <label for="openai-model">Model</label>
+    <select id="openai-model">
+      <option value="gpt-4o">gpt-4o</option>
+      <option value="gpt-4o-mini">gpt-4o-mini</option>
+      <option value="gpt-4-turbo">gpt-4-turbo</option>
+      <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+    </select>
+    <p class="hint">Get your key at platform.openai.com</p>
+  </div>
+
+  <hr class="divider" />
+  <button id="save-btn">Test & Save</button>
+  <p id="status"></p>
+
+  <script src="dist/popup.js"></script>
+</body>
+</html>
