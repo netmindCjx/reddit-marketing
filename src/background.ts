@@ -10,6 +10,7 @@ interface Settings {
   openaiModel?: string;
   netmindKey?: string;
   netmindModel?: string;
+  customPrompt?: string;
 }
 
 // ── Context menu ─────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // ── Settings ─────────────────────────────────────────────────────────────────
 async function loadSettings(): Promise<Settings> {
   const items = await chrome.storage.sync.get([
-    "provider", "claudeKey", "openaiKey", "openaiModel", "netmindKey", "netmindModel",
+    "provider", "claudeKey", "openaiKey", "openaiModel", "netmindKey", "netmindModel", "customPrompt",
   ]);
   return {
     provider:     (items["provider"]     as Provider | undefined) ?? "netmind",
@@ -66,10 +67,11 @@ async function loadSettings(): Promise<Settings> {
     openaiModel:  (items["openaiModel"] as string | undefined) ?? "gpt-4o",
     netmindKey:   items["netmindKey"]   as string | undefined,
     netmindModel: (items["netmindModel"] as string | undefined) ?? "deepseek-ai/DeepSeek-V4-Flash",
+    customPrompt: items["customPrompt"] as string | undefined,
   };
 }
 
-const SYSTEM_PROMPT = `You are a Reddit user who's part of a small team building NarraNexus, an open-source multi-agent platform. You genuinely like discussing AI agents, multi-agent workflows, and automation.
+const DEFAULT_SYSTEM_PROMPT = `You are a Reddit user who's part of a small team building NarraNexus, an open-source multi-agent platform. You genuinely like discussing AI agents, multi-agent workflows, and automation.
 
 Your tone:
 - Write like a real Redditor: casual, use common abbreviations (tbh, ngl, imo, fwiw, ymmv, afaik, etc.)
@@ -88,22 +90,25 @@ Examples of your voice:
 - "imo the template approach works better than wiring everything from scratch. we have a few in NarraNexus (research, financial brief, etc.) that you can fork and tweak. not saying it's perfect but saves a lot of boilerplate"
 - "ngl most multi-agent frameworks feel like you're just writing glue code. that's kinda why we started NarraNexus — wanted agents that can actually persist state and collaborate w/o me babysitting every interaction"`;
 
-const USER_PROMPT_SUFFIX = `\n\nWrite your reply as a Redditor. Answer the question first, mention NarraNexus only if relevant. No links.`;
+function getSystemPrompt(customPrompt?: string): string {
+  return customPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+}
 
 function buildUserPrompt(postText: string, existingReplies: string[]): string {
   let prompt = `Reddit post/comment to reply to:\n${postText}`;
   if (existingReplies.length > 0) {
     prompt += `\n\nExisting replies in thread:\n${existingReplies.slice(0, 3).join("\n---\n")}`;
   }
-  return prompt + USER_PROMPT_SUFFIX;
+  return prompt + `\n\nWrite your reply.`;
 }
 
 async function handleGenerateReply(postText: string, existingReplies: string[]): Promise<string> {
   const s = await loadSettings();
-  const prompt = buildUserPrompt(postText, existingReplies);
-  if (s.provider === "claude") return callClaude(s.claudeKey, prompt);
-  if (s.provider === "openai") return callOpenAI(s.openaiKey, s.openaiModel ?? "gpt-4o", prompt);
-  return callNetmind(s.netmindKey, s.netmindModel ?? "deepseek-ai/DeepSeek-V4-Flash", prompt);
+  const sysPrompt = getSystemPrompt(s.customPrompt);
+  const userPrompt = buildUserPrompt(postText, existingReplies);
+  if (s.provider === "claude") return callClaude(s.claudeKey, sysPrompt, userPrompt);
+  if (s.provider === "openai") return callOpenAI(s.openaiKey, s.openaiModel ?? "gpt-4o", sysPrompt, userPrompt);
+  return callNetmind(s.netmindKey, s.netmindModel ?? "deepseek-ai/DeepSeek-V4-Flash", sysPrompt, userPrompt);
 }
 
 // ── Connectivity test ────────────────────────────────────────────────────────
@@ -138,12 +143,12 @@ async function testApiKey(provider: Provider, apiKey: string, model?: string): P
 }
 
 // ── Claude ───────────────────────────────────────────────────────────────────
-async function callClaude(apiKey: string | undefined, userPrompt: string): Promise<string> {
+async function callClaude(apiKey: string | undefined, sysPrompt: string, userPrompt: string): Promise<string> {
   if (!apiKey) throw new Error("No Claude API key set.");
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 300, system: SYSTEM_PROMPT, messages: [{ role: "user", content: userPrompt }] }),
+    body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 300, system: sysPrompt, messages: [{ role: "user", content: userPrompt }] }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
@@ -155,7 +160,7 @@ async function callClaude(apiKey: string | undefined, userPrompt: string): Promi
 
 // ── OpenAI-format call (shared by OpenAI and NetMind) ────────────────────────
 async function callOpenAIFormat(
-  baseUrl: string, apiKey: string, model: string, userPrompt: string,
+  baseUrl: string, apiKey: string, model: string, sysPrompt: string, userPrompt: string,
 ): Promise<string> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -164,7 +169,7 @@ async function callOpenAIFormat(
       model,
       max_tokens: 512,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: sysPrompt },
         { role: "user", content: userPrompt },
       ],
     }),
@@ -184,12 +189,12 @@ async function callOpenAIFormat(
   return data.choices[0]?.message?.content?.trim() ?? "";
 }
 
-function callOpenAI(apiKey: string | undefined, model: string, userPrompt: string): Promise<string> {
+function callOpenAI(apiKey: string | undefined, model: string, sysPrompt: string, userPrompt: string): Promise<string> {
   if (!apiKey) throw new Error("No OpenAI API key set.");
-  return callOpenAIFormat("https://api.openai.com/v1", apiKey, model, userPrompt);
+  return callOpenAIFormat("https://api.openai.com/v1", apiKey, model, sysPrompt, userPrompt);
 }
 
-function callNetmind(apiKey: string | undefined, model: string, userPrompt: string): Promise<string> {
+function callNetmind(apiKey: string | undefined, model: string, sysPrompt: string, userPrompt: string): Promise<string> {
   if (!apiKey) throw new Error("No NetMind API key set.");
-  return callOpenAIFormat("https://api.netmind.ai/inference-api/openai/v1", apiKey, model, userPrompt);
+  return callOpenAIFormat("https://api.netmind.ai/inference-api/openai/v1", apiKey, model, sysPrompt, userPrompt);
 }
