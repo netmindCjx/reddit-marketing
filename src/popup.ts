@@ -22,6 +22,17 @@ Examples of your voice:
 - "imo the template approach works better than wiring everything from scratch. we have a few in NarraNexus (research, financial brief, etc.) that you can fork and tweak. not saying it's perfect but saves a lot of boilerplate"
 - "ngl most multi-agent frameworks feel like you're just writing glue code. that's kinda why we started NarraNexus — wanted agents that can actually persist state and collaborate w/o me babysitting every interaction"`;
 
+const DEFAULT_DM_PROMPT = `You are reaching out to someone on X (Twitter) via direct message. You write short, warm, human DMs that don't feel like cold outreach or marketing.
+
+Your tone:
+- Casual and genuine, like messaging someone you find interesting. 1-3 sentences.
+- Open by referencing something specific from their recent posts — show you actually read them.
+- Sound like a real person, not a template. No "Hope you're doing well!" filler, no corporate speak.
+- Be specific over generic. "saw your take on X" > "love your content".
+- Don't be sycophantic or over-complimentary. A little curiosity goes further than flattery.
+- No links, no hard pitch. The goal is to start a real conversation.
+- Don't start with "Hey there!" generic openers — jump into something specific.`;
+
 const providerSelect    = document.getElementById("provider")        as HTMLSelectElement;
 const claudeSection     = document.getElementById("claude-section")  as HTMLDivElement;
 const openaiSection     = document.getElementById("openai-section")  as HTMLDivElement;
@@ -34,6 +45,9 @@ const netmindModelInput = document.getElementById("netmind-model")   as HTMLInpu
 const promptToggle      = document.getElementById("prompt-toggle")   as HTMLSpanElement;
 const promptSection     = document.getElementById("prompt-section")  as HTMLDivElement;
 const promptTextarea    = document.getElementById("system-prompt")   as HTMLTextAreaElement;
+const dmPromptToggle    = document.getElementById("dm-prompt-toggle")  as HTMLSpanElement;
+const dmPromptSection    = document.getElementById("dm-prompt-section") as HTMLDivElement;
+const dmPromptTextarea   = document.getElementById("dm-prompt")         as HTMLTextAreaElement;
 const saveBtn           = document.getElementById("save-btn")        as HTMLButtonElement;
 const statusEl          = document.getElementById("status")          as HTMLParagraphElement;
 
@@ -52,7 +66,16 @@ function showSection(provider: Provider): void {
 promptToggle.addEventListener("click", () => {
   const visible = promptSection.style.display !== "none";
   promptSection.style.display = visible ? "none" : "block";
-  promptToggle.textContent = visible ? "▶ Custom System Prompt" : "▼ Custom System Prompt";
+  promptToggle.textContent = visible
+    ? "▶ Custom System Prompt (Reddit / Product Hunt)"
+    : "▼ Custom System Prompt (Reddit / Product Hunt)";
+});
+
+// Toggle Twitter DM prompt editor visibility
+dmPromptToggle.addEventListener("click", () => {
+  const visible = dmPromptSection.style.display !== "none";
+  dmPromptSection.style.display = visible ? "none" : "block";
+  dmPromptToggle.textContent = visible ? "▶ Twitter DM Prompt" : "▼ Twitter DM Prompt";
 });
 
 providerSelect.addEventListener("change", () => {
@@ -62,7 +85,7 @@ providerSelect.addEventListener("change", () => {
 
 // Load saved settings
 chrome.storage.sync.get(
-  ["provider", "claudeKey", "openaiKey", "openaiModel", "netmindKey", "netmindModel", "customPrompt"],
+  ["provider", "claudeKey", "openaiKey", "openaiModel", "netmindKey", "netmindModel", "customPrompt", "twitterDmPrompt"],
   (items) => {
     const provider = (items["provider"] as Provider | undefined) ?? "netmind";
     providerSelect.value = provider;
@@ -74,6 +97,7 @@ chrome.storage.sync.get(
     if (items["netmindModel"]) netmindModelInput.value = items["netmindModel"] as string;
     // Always show the prompt — saved custom or default
     promptTextarea.value = (items["customPrompt"] as string | undefined)?.trim() || DEFAULT_PROMPT;
+    dmPromptTextarea.value = (items["twitterDmPrompt"] as string | undefined)?.trim() || DEFAULT_DM_PROMPT;
     const hasKey =
       provider === "claude"  ? !!items["claudeKey"]  :
       provider === "openai"  ? !!items["openaiKey"]  :
@@ -135,8 +159,9 @@ saveBtn.addEventListener("click", async () => {
     data["netmindModel"] = model ?? "deepseek-ai/DeepSeek-V4-Flash";
   }
 
-  // Save custom prompt (empty string = use default)
+  // Save custom prompts (empty string = use default)
   data["customPrompt"] = promptTextarea.value.trim();
+  data["twitterDmPrompt"] = dmPromptTextarea.value.trim();
 
   chrome.storage.sync.set(data, () => setStatus("Connected & saved!", "ok"));
 });

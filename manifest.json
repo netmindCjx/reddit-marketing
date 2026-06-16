@@ -1,19 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "Reddit AI Reply",
-  "version": "1.0.0",
-  "description": "Generate AI-powered replies on Reddit with one click",
-  "permissions": ["storage", "contextMenus", "scripting"],
+  "name": "AI Reply",
+  "version": "1.1.0",
+  "description": "Generate AI-powered replies on Reddit, Product Hunt, and X (Twitter) DMs with one click",
+  "permissions": ["storage", "contextMenus", "scripting", "tabs"],
   "host_permissions": [
     "https://www.reddit.com/*",
     "https://reddit.com/*",
+    "https://www.producthunt.com/*",
+    "https://x.com/*",
+    "https://twitter.com/*",
     "https://api.netmind.ai/*",
     "https://api.anthropic.com/*",
     "https://api.openai.com/*"
   ],
   "content_scripts": [
     {
-      "matches": ["https://www.reddit.com/*", "https://reddit.com/*"],
+      "matches": [
+        "https://www.reddit.com/*",
+        "https://reddit.com/*",
+        "https://www.producthunt.com/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
       "js": ["dist/content.js"],
       "run_at": "document_idle"
     }
@@ -23,7 +32,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Reddit AI Reply"
+    "default_title": "AI Reply"
   },
   "icons": {
     "16": "icons/icon16.png",

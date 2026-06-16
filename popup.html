@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Reddit AI Reply</title>
+  <title>AI Reply</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -70,7 +70,7 @@
   </style>
 </head>
 <body>
-  <h2>Reddit AI Reply</h2>
+  <h2>AI Reply</h2>
 
   <label for="provider">AI Provider</label>
   <select id="provider">
@@ -111,11 +111,18 @@
 
   <hr class="divider" />
 
-  <span class="prompt-toggle" id="prompt-toggle">▶ Custom System Prompt</span>
+  <span class="prompt-toggle" id="prompt-toggle">▶ Custom System Prompt (Reddit / Product Hunt)</span>
   <div id="prompt-section" style="display:none">
     <label for="system-prompt">System Prompt</label>
     <textarea id="system-prompt" rows="10" placeholder="Enter your custom system prompt…"></textarea>
     <p class="hint">Leave empty to use the built-in default prompt. Changes are saved with the button below.</p>
+  </div>
+
+  <span class="prompt-toggle" id="dm-prompt-toggle">▶ Twitter DM Prompt</span>
+  <div id="dm-prompt-section" style="display:none">
+    <label for="dm-prompt">Twitter DM System Prompt</label>
+    <textarea id="dm-prompt" rows="10" placeholder="Enter your Twitter DM system prompt…"></textarea>
+    <p class="hint">Used by the “✨ AI DM” button on X. Leave empty to use the built-in default. Changes are saved with the button below.</p>
   </div>
 
   <button id="save-btn">Test & Save</button>

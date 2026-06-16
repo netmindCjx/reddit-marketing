@@ -159,6 +159,32 @@ function isReloadError(err: unknown): boolean {
   return s.includes("CONTEXT_INVALIDATED") || s.includes("context invalidated") || s.includes("Extension context");
 }
 
+// ── Platform detection ──────────────────────────────────────────────────────
+type Platform = "reddit" | "producthunt" | "twitter";
+
+function detectPlatform(): Platform {
+  if (location.hostname.includes("producthunt.com")) return "producthunt";
+  if (location.hostname.includes("x.com") || location.hostname.includes("twitter.com")) return "twitter";
+  return "reddit";
+}
+
+const currentPlatform = detectPlatform();
+
+// X (Twitter) DM composer — the textarea inside an open chat conversation.
+const TWITTER_DM_COMPOSER = '[data-testid="dm-composer-textarea"]';
+
+// Parse the conversation partner's numeric user id from an XChat URL + cookies.
+// URL form: /i/chat/<id1>-<id2>; own id lives in the `twid` cookie (twid=u%3D<id>).
+function getDmPartnerId(): string | null {
+  const m = location.pathname.match(/^\/i\/chat\/(\d+)-(\d+)/);
+  if (!m) return null;
+  const ids = [m[1], m[2]];
+  const own = document.cookie.match(/twid=u%3D(\d+)/) || document.cookie.match(/twid=u=(\d+)/);
+  const ownId = own?.[1];
+  if (!ownId) return null;
+  return ids.find((id) => id !== ownId) ?? null;
+}
+
 // ── Floating button (appears when an editor is focused) ──────────────────────
 const floatingBtn = document.createElement("button");
 floatingBtn.id = "ai-reply-floating-btn";
@@ -170,6 +196,11 @@ let hideTimer: ReturnType<typeof setTimeout> | null = null;
 let isBusy = false;  // true while generating — suppress hide
 
 function isReplyEditor(el: Element): boolean {
+  // X (Twitter) DM composer: match by testid; its width can be tiny when empty,
+  // so skip the generic width heuristic below.
+  if (currentPlatform === "twitter") {
+    return el.matches(TWITTER_DM_COMPOSER) || !!el.closest(TWITTER_DM_COMPOSER);
+  }
   const isContentEditable = el.getAttribute("contenteditable") === "true";
   const isTextarea = el.tagName === "TEXTAREA";
   if (!isContentEditable && !isTextarea) return false;
@@ -180,6 +211,16 @@ function isReplyEditor(el: Element): boolean {
 }
 
 function positionFloatingBtn(editor: HTMLElement): void {
+  if (currentPlatform === "twitter") {
+    // DM composer is small/at the bottom — anchor to its container and float
+    // the button just above the composer bar, right-aligned.
+    const anchor = (editor.closest('[role="group"], form') as HTMLElement | null) ?? editor.parentElement ?? editor;
+    const rect = anchor.getBoundingClientRect();
+    floatingBtn.style.top  = `${Math.max(rect.top - 40, 8)}px`;
+    floatingBtn.style.left = `${Math.max(rect.right - 120, 8)}px`;
+    floatingBtn.style.display = "block";
+    return;
+  }
   const rect = editor.getBoundingClientRect();
   floatingBtn.style.top  = `${rect.bottom + 8}px`;
   floatingBtn.style.left = `${rect.left}px`;
@@ -189,6 +230,7 @@ function positionFloatingBtn(editor: HTMLElement): void {
 function showFloatingBtn(editor: HTMLElement): void {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
   currentEditor = editor;
+  floatingBtn.textContent = currentPlatform === "twitter" ? "✨ AI DM" : "✨ AI Reply";
   positionFloatingBtn(editor);
 }
 
@@ -333,6 +375,7 @@ async function showReplyModal(selectedText: string): Promise<void> {
         type: "GENERATE_REPLY",
         postText: selectedText.slice(0, 800),
         existingReplies: gatherPageReplies(),
+        platform: currentPlatform,
       });
 
       if (!res.ok) throw new Error(res.error);
@@ -380,6 +423,7 @@ async function generateForEditor(editor: HTMLElement): Promise<void> {
       type: "GENERATE_REPLY",
       postText: editor.textContent?.slice(0, 800) ?? "",
       existingReplies: gatherPageReplies(),
+      platform: currentPlatform,
     });
 
     if (!res.ok) throw new Error(res.error);
@@ -399,12 +443,40 @@ async function generateForEditor(editor: HTMLElement): Promise<void> {
   }
 }
 
+// Twitter DM: resolve the partner, scrape their posts (in background), insert.
+async function generateForDm(editor: HTMLElement): Promise<void> {
+  isBusy = true;
+  floatingBtn.disabled = true;
+  floatingBtn.textContent = "⏳ Reading posts…";
+
+  try {
+    const partnerId = getDmPartnerId();
+    if (!partnerId) throw new Error("Open a DM conversation first.");
+
+    const res = await safeSendMessage({ type: "SCRAPE_AND_GENERATE_DM", partnerId });
+    if (!res.ok) throw new Error(res.error);
+    if (res.reply) insertTextIntoEditor(editor, res.reply);
+    floatingBtn.textContent = "🔄 Retry";
+  } catch (err) {
+    if (isReloadError(err)) {
+      floatingBtn.textContent = "🔄 Reload page";
+    } else {
+      floatingBtn.textContent = "❌ Retry";
+      console.warn("[AI Reply]", err);
+    }
+  } finally {
+    isBusy = false;
+    floatingBtn.disabled = false;
+  }
+}
+
 floatingBtn.addEventListener("click", (e) => {
   e.preventDefault();
   e.stopPropagation();
   const editor = currentEditor;
   if (!editor || isBusy) return;
-  generateForEditor(editor).catch(() => {});
+  const run = currentPlatform === "twitter" ? generateForDm(editor) : generateForEditor(editor);
+  run.catch(() => {});
 });
 
 // ── Listen for context menu trigger from background ──────────────────────────
